@@ -21,13 +21,13 @@ class SimpleMsg
 public :
 	SimpleMsg(MsgrType mt, int port);
 	~SimpleMsg();
-	//·Ç×èÈû£¬·¢ËÍ×Ö·û´®
+	//éé˜»å¡ï¼Œå‘é€å­—ç¬¦ä¸²
 	int sendMsg(const std::string& msg);
-	 //ÉèÖÃ½ÓÊÕ×Ö·û´®µÄ´¦Àí»Øµ÷
+	 //è®¾ç½®æ¥æ”¶å­—ç¬¦ä¸²çš„å¤„ç†å›è°ƒ
 	void setHandler(msgHandler mh);
-	//·Ç×èÈû£¬´Ó½ÓÊÕÁĞ±íÀï»ñÈ¡×îÇ°¶ËµÄ×Ö·û´®£¬·µ»Øµ±Ç°½ÓÊÕÁĞ±í³¤¶È£¬Èç¹ûÒÑ¾­ÉèÖÃ»Øµ÷Ôò·µ»Ø-1
+	//éé˜»å¡ï¼Œä»æ¥æ”¶åˆ—è¡¨é‡Œè·å–æœ€å‰ç«¯çš„å­—ç¬¦ä¸²ï¼Œè¿”å›å½“å‰æ¥æ”¶åˆ—è¡¨é•¿åº¦ï¼Œå¦‚æœå·²ç»è®¾ç½®å›è°ƒåˆ™è¿”å›-1
 	int recvMsg(std::string& msg);
-	//·µ»ØÀàÊÇ·ñÓĞĞ§
+	//è¿”å›ç±»æ˜¯å¦æœ‰æ•ˆ
 	bool available();
 private:
 	unsigned int STDCALL_ Rcv(void* lpParam);
@@ -35,10 +35,11 @@ private:
 	void svrWorkerThread(void* lpParam);
 	void clnWorkerThread(void* lpParam);
 	bool m_inited = false;
+	bool m_over = false;
 	int m_port = 0;
 	bool m_serror = false;
-	std::mutex m_sendMutex;
-	std::mutex m_recvMutex;
+	mutable std::mutex m_sendMutex;
+	mutable std::mutex m_recvMutex;
 	std::list <std::string> m_sendList;
 	std::list <std::string> m_recvList;
 	MsgrType m_type;
