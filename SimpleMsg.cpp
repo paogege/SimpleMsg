@@ -1,14 +1,14 @@
 #include <stdio.h>
 #include <thread>
 #ifdef WIN32
-#include <Winsock2.h> //SocketµÄº¯Êıµ÷ÓÃ¡¡
+#include <Winsock2.h> //Socketçš„å‡½æ•°è°ƒç”¨ã€€
 #include <windows.h>
-#pragma comment (lib, "ws2_32")     // Ê¹ÓÃWINSOCK2.HÊ±£¬ÔòĞèÒª¿âÎÄ¼şWS2_32.LIB
+#pragma comment (lib, "ws2_32")     // ä½¿ç”¨WINSOCK2.Hæ—¶ï¼Œåˆ™éœ€è¦åº“æ–‡ä»¶WS2_32.LIB
 #else
 #endif
 #include "SimpleMsg.h"
 
-#define BUF_SIZE 6400  //  »º³åÇø´óĞ¡
+#define BUF_SIZE 6400  //  ç¼“å†²åŒºå¤§å°
 #define LIST_SIZE 300
 
 SimpleMsg::SimpleMsg(MsgrType mt, int port)
@@ -26,7 +26,7 @@ SimpleMsg::SimpleMsg(MsgrType mt, int port)
 
 	if (mt == MsgrType::SVR)
 	{
-		//  ´´½¨·şÎñ¶ÎÌ×½Ó×Ö
+		//  åˆ›å»ºæœåŠ¡æ®µå¥—æ¥å­—
 		SOCKET sServer = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 		if (sServer == INVALID_SOCKET) {
 			printf("socket faild!\n");
@@ -34,14 +34,14 @@ SimpleMsg::SimpleMsg(MsgrType mt, int port)
 			return;
 		}
 
-		//  ·şÎñ¶ËµØÖ·
+		//  æœåŠ¡ç«¯åœ°å€
 		sockaddr_in addrServ;
 
 		addrServ.sin_family = AF_INET;
 		addrServ.sin_port = htons(m_port);
 		addrServ.sin_addr.s_addr = htonl(INADDR_ANY);
 
-		//  °ó¶¨Ì×½Ó×Ö
+		//  ç»‘å®šå¥—æ¥å­—
 		if (bind(sServer, (const struct sockaddr*)&addrServ, sizeof(addrServ)) == SOCKET_ERROR) {
 			printf("bind faild!\n");
 			closesocket(sServer);
@@ -56,7 +56,7 @@ SimpleMsg::SimpleMsg(MsgrType mt, int port)
 
 	else if (mt == MsgrType::CLN)
 	{
-		//  ·şÎñÆ÷Ì×½Ó×Ö
+		//  æœåŠ¡å™¨å¥—æ¥å­—
 		SOCKET sHost = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 		if (sHost == INVALID_SOCKET) {
 			printf("socket faild!\n");
@@ -71,6 +71,18 @@ SimpleMsg::SimpleMsg(MsgrType mt, int port)
 
 SimpleMsg::~SimpleMsg()
 {
+	bool waitSend = true;
+	while(waitSend)
+	{
+		waitSend = false;
+		std::lock_guard<std::mutex> lock(m_sendMutex);
+		if (m_sendList.size())
+		{
+			waitSend = true;
+			continue;
+		}
+	}
+	m_over = true;
 #ifdef WIN32
 	WSACleanup();
 #endif
@@ -78,6 +90,7 @@ SimpleMsg::~SimpleMsg()
 
 int SimpleMsg::sendMsg(const std::string& msg)
 {
+	if (m_over)return 0;
 	std::lock_guard<std::mutex> lock(m_sendMutex);
 	while (m_sendList.size() >= LIST_SIZE)
 	{
@@ -133,7 +146,7 @@ unsigned int STDCALL_ SimpleMsg::Rcv(void* lpParam)
 			break;
 		}
 		else {
-			//printf("ÊÕµ½·şÎñÆ÷ÏûÏ¢£º%s\n", bufRecv);
+			//printf("æ”¶åˆ°æœåŠ¡å™¨æ¶ˆæ¯ï¼š%s\n", bufRecv);
 			if (m_hdr)
 			{
 				m_hdr(bufRecv);
@@ -172,6 +185,7 @@ unsigned int STDCALL_ SimpleMsg::Snd(void* lpParam)
 			}
 		}		
 		Sleep(0);
+		if (m_over)return 0;
 	}
 	return 0;
 }
@@ -186,7 +200,7 @@ void SimpleMsg::svrWorkerThread(void* lpParam)
 		return;
 	}
 
-	SOCKET sClient; //  ¿Í»§¶ËÌ×½Ó×Ö
+	SOCKET sClient; //  å®¢æˆ·ç«¯å¥—æ¥å­—
 
 	sockaddr_in addrClient;
 	int addrClientLen = sizeof(addrClient);	
@@ -211,7 +225,7 @@ void SimpleMsg::svrWorkerThread(void* lpParam)
 
 
 	closesocket(sClient);
-	WSACleanup(); // ×ÊÔ´ÊÍ·Å
+	WSACleanup(); // èµ„æºé‡Šæ”¾
 }
 
 void SimpleMsg::clnWorkerThread(void* lpParam)
@@ -219,11 +233,11 @@ void SimpleMsg::clnWorkerThread(void* lpParam)
 	SOCKET sHost = *(SOCKET*)lpParam;
 	SOCKADDR_IN servAddr;
 	servAddr.sin_family = AF_INET;
-	//  ×¢Òâ   µ±°Ñ¿Í»§¶Ë³ÌĞò·¢µ½±ğÈËµÄµçÄÔÊ± ´Ë´¦IPĞè¸ÄÎª·şÎñÆ÷ËùÔÚµçÄÔµÄIP
+	//  æ³¨æ„   å½“æŠŠå®¢æˆ·ç«¯ç¨‹åºå‘åˆ°åˆ«äººçš„ç”µè„‘æ—¶ æ­¤å¤„IPéœ€æ”¹ä¸ºæœåŠ¡å™¨æ‰€åœ¨ç”µè„‘çš„IP
 	servAddr.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
 	servAddr.sin_port = htons(m_port);
 
-	//  Á¬½Ó·şÎñÆ÷
+	//  è¿æ¥æœåŠ¡å™¨
 	if (connect(sHost, (LPSOCKADDR)&servAddr, sizeof(servAddr)) == SOCKET_ERROR) {
 		printf("connect faild!\n");
 		closesocket(sHost);
