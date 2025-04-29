@@ -17,7 +17,7 @@ SimpleMsg::SimpleMsg(MsgrType mt, int port)
 	WSADATA wsaData;
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
 		printf("winsock load faild!\n");
-		return ;
+		return;
 	}
 #endif
 
@@ -72,7 +72,7 @@ SimpleMsg::SimpleMsg(MsgrType mt, int port)
 SimpleMsg::~SimpleMsg()
 {
 	bool waitSend = true;
-	while(waitSend)
+	while (waitSend)
 	{
 		waitSend = false;
 		std::lock_guard<std::mutex> lock(m_sendMutex);
@@ -116,12 +116,12 @@ int SimpleMsg::recvMsg(std::string& msg)
 	{
 		std::lock_guard<std::mutex> lock(m_recvMutex);
 		int ret = m_recvList.size();
-		if (m_recvList.size() )
+		if (m_recvList.size())
 		{
 			msg = m_recvList.front();
 			m_recvList.pop_front();
 		}
-		
+
 		return ret;
 	}
 }
@@ -136,32 +136,61 @@ unsigned int STDCALL_ SimpleMsg::Rcv(void* lpParam)
 {
 	SOCKET sHost = *(SOCKET*)lpParam;
 	int retVal = -1;
-	char bufRecv[BUF_SIZE];
-	memset(bufRecv, 0, sizeof(bufRecv));
+	byte dataSize[4] = { 0 };
 	while (1)
 	{
-		retVal = recv(sHost, bufRecv, BUF_SIZE, 0);
-		if (retVal == -1 || retVal == 0) {
-			printf("recive faild!\n");
-			m_serror = true;
+		int remainSize = 4;
+		while (remainSize > 0)
+		{
+			retVal = recv(sHost, (char*)dataSize, remainSize, 0);
+			if (retVal == -1 || retVal == 0) {
+				printf("recive faild!\n");
+				m_serror = true;
+				break;
+			}
+			remainSize -= retVal;
+		}
+		if (m_serror)
+		{
 			break;
 		}
-		else {
-			//printf("收到服务器消息：%s\n", bufRecv);
-			if (m_hdr)
-			{
-				m_hdr(bufRecv);
+
+		auto iSize = *(int*)dataSize;
+		remainSize = iSize;
+
+		auto bufRecv = new char[remainSize + 1];
+		while (remainSize > 0)
+		{
+			retVal = recv(sHost, bufRecv + (iSize - remainSize), remainSize, 0);
+			if (retVal == -1 || retVal == 0) {
+				printf("recive faild!\n");
+				m_serror = true;
+				break;
 			}
-			else
-			{
-				std::lock_guard<std::mutex> lock(m_recvMutex);
-				while (m_recvList.size() >= LIST_SIZE)
-				{
-					m_recvList.pop_front();
-				}
-				m_recvList.push_back(bufRecv);
-			}
+			remainSize -= retVal;
 		}
+
+		if (m_serror)
+		{
+			break;
+		}
+
+		
+		//printf("收到服务器消息：%s\n", bufRecv);
+		if (m_hdr)
+		{
+			m_hdr(bufRecv);
+		}
+		else
+		{
+			std::lock_guard<std::mutex> lock(m_recvMutex);
+			while (m_recvList.size() >= LIST_SIZE)
+			{
+				m_recvList.pop_front();
+			}
+			m_recvList.push_back(bufRecv);
+		}
+		
 	}
 	return 0;
 }
@@ -178,13 +207,35 @@ unsigned int STDCALL_ SimpleMsg::Snd(void* lpParam)
 			std::string smsg;
 			smsg = m_sendList.front();
 			m_sendList.pop_front();
-			retVal = send(sHost,smsg.c_str() , strlen(smsg.c_str()) + sizeof(char), 0);
-			if (retVal == -1) {
-				printf("send faild!\n");
-				m_serror = true;
-				break;
+
+			unsigned int msgSize = strlen(smsg.c_str()) + sizeof(char);
+			int remainSize = 4;
+			while (remainSize > 0)
+			{
+				retVal = send(sHost, (char*)&msgSize + (4 - remainSize), remainSize, 0);
+				
+				if (retVal == -1) {
+					printf("send faild!\n");
+					m_serror = true;
+					break;
+				}
+				remainSize -= retVal;
 			}
-		}		
+			if (m_serror)break;
+			
+			remainSize = msgSize;
+			while (remainSize > 0)
+			{
+				retVal = send(sHost, smsg.c_str() + (msgSize - remainSize), remainSize, 0);
+				remainSize -= retVal;
+				if (retVal == -1) {
+					printf("send faild!\n");
+					m_serror = true;
+					break;
+				}
+			}
+			if (m_serror)break;
+		}
 		Sleep(0);
 		if (m_over)return 0;
 	}
@@ -204,10 +255,10 @@ void SimpleMsg::svrWorkerThread(void* lpParam)
 	SOCKET sClient; //  客户端套接字
 
 	sockaddr_in addrClient;
-	int addrClientLen = sizeof(addrClient);	
-	
+	int addrClientLen = sizeof(addrClient);
 
-	
+
+
 	while (1)
 	{
 		sClient = accept(sServer, (sockaddr FAR*)&addrClient, &addrClientLen);
@@ -222,7 +273,7 @@ void SimpleMsg::svrWorkerThread(void* lpParam)
 		std::thread t2(&SimpleMsg::Rcv, this, (void**)&sClient);
 		t2.join();
 	}
-	
+
 
 
 	closesocket(sClient);
