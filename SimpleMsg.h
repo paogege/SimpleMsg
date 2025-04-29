@@ -21,13 +21,13 @@ class SimpleMsg
 public :
 	SimpleMsg(MsgrType mt, int port);
 	~SimpleMsg();
-	//éé˜»å¡ï¼Œå‘é€å­—ç¬¦ä¸²
+	//·Ç×èÈû£¬·¢ËÍ×Ö·û´®
 	int sendMsg(const std::string& msg);
-	 //è®¾ç½®æ¥æ”¶å­—ç¬¦ä¸²çš„å¤„ç†å›è°ƒ
+	 //ÉèÖÃ½ÓÊÕ×Ö·û´®µÄ´¦Àí»Øµ÷
 	void setHandler(msgHandler mh);
-	//éé˜»å¡ï¼Œä»æ¥æ”¶åˆ—è¡¨é‡Œè·å–æœ€å‰ç«¯çš„å­—ç¬¦ä¸²ï¼Œè¿”å›å½“å‰æ¥æ”¶åˆ—è¡¨é•¿åº¦ï¼Œå¦‚æœå·²ç»è®¾ç½®å›è°ƒåˆ™è¿”å›-1
+	//·Ç×èÈû£¬´Ó½ÓÊÕÁĞ±íÀï»ñÈ¡×îÇ°¶ËµÄ×Ö·û´®£¬·µ»Øµ±Ç°½ÓÊÕÁĞ±í³¤¶È£¬Èç¹ûÒÑ¾­ÉèÖÃ»Øµ÷Ôò·µ»Ø-1
 	int recvMsg(std::string& msg);
-	//è¿”å›ç±»æ˜¯å¦æœ‰æ•ˆ
+	//·µ»ØÀàÊÇ·ñÓĞĞ§
 	bool available();
 private:
 	unsigned int STDCALL_ Rcv(void* lpParam);
