@@ -3,8 +3,25 @@
 #ifdef WIN32
 #include <Winsock2.h> //Socket的函数调用　
 #include <windows.h>
+#define _SOCKET SOCKET
+#define _CLOSESOCKET closesocket
+#define _SOCKETCLN	WSACleanup()
+#define _SLEEP _sleep
+#define _SOCKADDR_IN SOCKADDR_IN
 #pragma comment (lib, "ws2_32")     // 使用WINSOCK2.H时，则需要库文件WS2_32.LIB
 #else
+#include <iostream>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+#include <arpa/inet.h>
+#define _SOCKET int
+#define _CLOSESOCKET close
+#define _SOCKETCLN	;
+#define _SLEEP sleep
+#define _SOCKADDR_IN sockaddr_in
 #endif
 #include "SimpleMsg.h"
 
@@ -27,10 +44,10 @@ SimpleMsg::SimpleMsg(MsgrType mt, int port)
 	if (mt == MsgrType::SVR)
 	{
 		//  创建服务段套接字
-		SOCKET sServer = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-		if (sServer == INVALID_SOCKET) {
+		_SOCKET sServer = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		if (sServer == -1) {
 			printf("socket faild!\n");
-			WSACleanup();
+			_SOCKETCLN;
 			return;
 		}
 
@@ -42,10 +59,10 @@ SimpleMsg::SimpleMsg(MsgrType mt, int port)
 		addrServ.sin_addr.s_addr = htonl(INADDR_ANY);
 
 		//  绑定套接字
-		if (bind(sServer, (const struct sockaddr*)&addrServ, sizeof(addrServ)) == SOCKET_ERROR) {
+		if (bind(sServer, (const struct sockaddr*)&addrServ, sizeof(addrServ)) == -1) {
 			printf("bind faild!\n");
-			closesocket(sServer);
-			WSACleanup();
+			_CLOSESOCKET(sServer);
+			_SOCKETCLN;
 			return;
 		}
 
@@ -57,10 +74,10 @@ SimpleMsg::SimpleMsg(MsgrType mt, int port)
 	else if (mt == MsgrType::CLN)
 	{
 		//  服务器套接字
-		SOCKET sHost = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-		if (sHost == INVALID_SOCKET) {
+		_SOCKET sHost = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		if (sHost == -1) {
 			printf("socket faild!\n");
-			WSACleanup();
+			_SOCKETCLN;
 		}
 
 		std::thread wthrd(&SimpleMsg::clnWorkerThread, this, (void*)&sHost);
@@ -84,7 +101,7 @@ SimpleMsg::~SimpleMsg()
 	}
 	m_over = true;
 #ifdef WIN32
-	WSACleanup();
+	_SOCKETCLN;
 #endif
 }
 
@@ -134,9 +151,9 @@ bool SimpleMsg::available()
 
 unsigned int STDCALL_ SimpleMsg::Rcv(void* lpParam)
 {
-	SOCKET sHost = *(SOCKET*)lpParam;
+	_SOCKET sHost = *(_SOCKET*)lpParam;
 	int retVal = -1;
-	byte dataSize[4] = { 0 };
+	unsigned char dataSize[4] = { 0 };
 	while (1)
 	{
 		int remainSize = 4;
@@ -197,7 +214,7 @@ unsigned int STDCALL_ SimpleMsg::Rcv(void* lpParam)
 
 unsigned int STDCALL_ SimpleMsg::Snd(void* lpParam)
 {
-	SOCKET sHost = *(SOCKET*)lpParam;
+	_SOCKET sHost = *(_SOCKET*)lpParam;
 	int retVal = -1;
 	while (1)
 	{
@@ -236,7 +253,7 @@ unsigned int STDCALL_ SimpleMsg::Snd(void* lpParam)
 			}
 			if (m_serror)break;
 		}
-		Sleep(0);
+		_SLEEP(0);
 		if (m_over)return 0;
 	}
 	return 0;
@@ -244,28 +261,36 @@ unsigned int STDCALL_ SimpleMsg::Snd(void* lpParam)
 
 void SimpleMsg::svrWorkerThread(void* lpParam)
 {
-	SOCKET sServer = *(SOCKET*)lpParam;
+	_SOCKET sServer = *(_SOCKET*)lpParam;
 	if (listen(sServer, 5) == -1) {
 		printf("listen faild!\n");
-		closesocket(sServer);
-		WSACleanup();
+		_CLOSESOCKET(sServer);
+		_SOCKETCLN;
 		return;
 	}
 
-	SOCKET sClient; //  客户端套接字
+	_SOCKET sClient; //  客户端套接字
 
 	sockaddr_in addrClient;
+#ifdef WIN32
 	int addrClientLen = sizeof(addrClient);
+#else 
+	socklen_t addrClientLen = sizeof(addrClient);
+#endif
 
 
 
 	while (1)
 	{
+#ifdef WIN32
 		sClient = accept(sServer, (sockaddr FAR*)&addrClient, &addrClientLen);
-		if (sClient == INVALID_SOCKET) {
+#else
+		sClient = accept(sServer, (struct sockaddr*)&addrClient, &addrClientLen);
+#endif
+		if (sClient == -1) {
 			printf("accept faild!\n");
-			closesocket(sServer);
-			WSACleanup();
+			_CLOSESOCKET(sServer);
+			_SOCKETCLN;
 			return;
 		}
 		std::thread t1(&SimpleMsg::Snd, this, (void**)&sClient);
@@ -276,24 +301,28 @@ void SimpleMsg::svrWorkerThread(void* lpParam)
 
 
 
-	closesocket(sClient);
-	WSACleanup(); // 资源释放
+	_CLOSESOCKET(sClient);
+	_SOCKETCLN; // 资源释放
 }
 
 void SimpleMsg::clnWorkerThread(void* lpParam)
 {
-	SOCKET sHost = *(SOCKET*)lpParam;
-	SOCKADDR_IN servAddr;
+	_SOCKET sHost = *(_SOCKET*)lpParam;
+	_SOCKADDR_IN servAddr;
 	servAddr.sin_family = AF_INET;
 	//  注意   当把客户端程序发到别人的电脑时 此处IP需改为服务器所在电脑的IP
+#ifdef WIN32
 	servAddr.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
+#else
+	servAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+#endif
 	servAddr.sin_port = htons(m_port);
 
 	//  连接服务器
-	if (connect(sHost, (LPSOCKADDR)&servAddr, sizeof(servAddr)) == SOCKET_ERROR) {
+	if (connect(sHost, (sockaddr*)&servAddr, sizeof(servAddr)) == -1) {
 		printf("connect faild!\n");
-		closesocket(sHost);
-		WSACleanup();
+		_CLOSESOCKET(sHost);
+		_SOCKETCLN;
 	}
 
 	while (1)
@@ -310,6 +339,6 @@ void SimpleMsg::clnWorkerThread(void* lpParam)
 	}
 
 
-	closesocket(sHost);
-	WSACleanup();
+	_CLOSESOCKET(sHost);
+	_SOCKETCLN;
 }
