@@ -1,0 +1,1 @@
+add_library(SimpleMsg STATIC SimpleMsg.cpp)
