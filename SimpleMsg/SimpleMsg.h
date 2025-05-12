@@ -16,7 +16,24 @@ enum class MsgrType :int32_t
 	CLN,
 };
 
-extern "C" typedef void(*msgHandler)(char* recvMsg);
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+	typedef void(*msgHandler)(char* recvMsg);
+
+	typedef void* Messager;
+
+	Messager createMessager(MsgrType mt, int port);
+	void destroyMessager(Messager handle);
+	int MessagerSend(Messager handle, char* pString, int size);
+	int MessagerRecv(Messager handle, char* pString, int size);
+	bool isMessagerAvailabe(Messager handle);
+	void setMessagerReceiver(Messager handle, msgHandler mh);
+
+#ifdef __cplusplus
+}
+#endif
 
 class SimpleMsg
 {
@@ -48,19 +65,3 @@ private:
 	msgHandler m_hdr = 0;
 };
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-	typedef void* Messager;
-
-	Messager createMessager(MsgrType mt, int port);
-	void destroyMessager(Messager handle);
-	int MessagerSend(Messager handle,char* pString,int size);
-	int MessagerRecv(Messager handle, char* pString, int size);
-	bool isMessagerAvailabe(Messager handle);
-	void setMessagerReceiver(Messager handle,msgHandler mh);
-
-#ifdef __cplusplus
-}
-#endif

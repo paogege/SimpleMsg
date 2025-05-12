@@ -289,12 +289,14 @@ void SimpleMsg::svrWorkerThread(void* lpParam)
 #else
 		sClient = accept(sServer, (struct sockaddr*)&addrClient, &addrClientLen);
 #endif
+		printf("new client:%d\n", sClient);
 		if (sClient == _INVALID_SOCKET) {
 			printf("accept faild!\n");
 			_CLOSESOCKET(sServer);
 			_SOCKETCLN;
 			return;
 		}
+		m_serror = false;
 		std::thread t1(&SimpleMsg::Snd, this, (void**)&sClient);
 		t1.detach();
 		std::thread t2(&SimpleMsg::Rcv, this, (void**)&sClient);
