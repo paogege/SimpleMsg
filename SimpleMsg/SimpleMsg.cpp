@@ -206,9 +206,7 @@ unsigned int STDCALL_ SimpleMsg::Rcv(void* lpParam)
 		auto bufRecv = new char[remainSize + 1];
 		while (remainSize > 0)
 		{
-			writeLog("before recv\n", "svr.log");
 			retVal = recv(sHost, bufRecv + (iSize - remainSize), remainSize, 0);
-			writeLog("after recv\n", "svr.log");
 			if (retVal == -1 || retVal == 0) {
 				printf("recive faild!\n");
 				m_serror = true;
@@ -226,12 +224,10 @@ unsigned int STDCALL_ SimpleMsg::Rcv(void* lpParam)
 		//printf("收到服务器消息：%s\n", bufRecv);
 		if (m_hdr)
 		{
-			writeLog("call msgHandler", "svr.log");
 			m_hdr(bufRecv);
 		}
 		else
 		{
-			writeLog("recvList.push", "svr.log");
 			std::lock_guard<std::mutex> lock(m_recvMutex);
 			while (m_recvList.size() >= LIST_SIZE)
 			{
@@ -319,8 +315,6 @@ void SimpleMsg::svrWorkerThread(void* lpParam)
 #else
 		sClient = accept(sServer, (struct sockaddr*)&addrClient, &addrClientLen);
 #endif
-		printf("new client:%d\n", sClient);
-		writeLog("new client:" + std::to_string((int)sClient) + "\n", "svr.log");
 		if (sClient == _INVALID_SOCKET) {
 			printf("accept faild!\n");
 			_CLOSESOCKET(sServer);
