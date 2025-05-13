@@ -128,6 +128,8 @@ SimpleMsg::~SimpleMsg()
 		}
 	}
 	m_over = true;
+	//use sleep to avoid sendind failures
+	_SLEEP(300);
 	_CLOSESOCKET(m_localSocket);
 	_SOCKETCLN;
 }
@@ -202,7 +204,7 @@ unsigned int STDCALL_ SimpleMsg::Rcv(void* lpParam)
 			if (retVal == -1 || retVal == 0) {
 				printf("recive faild!\n");
 #ifdef _DEBUG
-				writeLog("receive error", "svr.log");
+				writeLog("receive faild", "svr.log");
 #endif
 				m_serror = true;
 				break;
