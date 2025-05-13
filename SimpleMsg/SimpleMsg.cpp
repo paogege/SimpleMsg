@@ -185,14 +185,39 @@ unsigned int STDCALL_ SimpleMsg::Rcv(void* lpParam)
 	{
 		int remainSize = 4;
 		while (remainSize > 0)
-		{
-			
+		{			
+#ifdef _DEBUG
+			std::string msg;
+			if (m_type == MsgrType::SVR)
+			{
+				msg = "SVR before receive";
+			}
+			else
+			{
+				msg = "CLN before receive";
+			}
+			writeLog(msg, "svr.log");
+#endif
 			retVal = recv(sHost, (char*)dataSize, remainSize, 0);
 			if (retVal == -1 || retVal == 0) {
 				printf("recive faild!\n");
+#ifdef _DEBUG
+				writeLog("receive error", "svr.log");
+#endif
 				m_serror = true;
 				break;
 			}
+#ifdef _DEBUG
+			if (m_type == MsgrType::SVR)
+			{
+				msg = "SVR after received";
+			}
+			else
+			{
+				msg = "CLN after received";
+			}
+			writeLog(msg, "svr.log");
+#endif
 			remainSize -= retVal;
 		}
 		if (m_serror)
@@ -258,7 +283,7 @@ unsigned int STDCALL_ SimpleMsg::Snd(void* lpParam)
 			while (remainSize > 0)
 			{
 				retVal = send(sHost, (char*)&msgSize + (4 - remainSize), remainSize, 0);
-
+				_SLEEP(0);
 				if (retVal == -1) {
 					printf("send faild!\n");
 					m_serror = true;
@@ -272,6 +297,7 @@ unsigned int STDCALL_ SimpleMsg::Snd(void* lpParam)
 			while (remainSize > 0)
 			{
 				retVal = send(sHost, smsg.c_str() + (msgSize - remainSize), remainSize, 0);
+				_SLEEP(0);
 				remainSize -= retVal;
 				if (retVal == -1) {
 					printf("send faild!\n");
@@ -305,9 +331,7 @@ void SimpleMsg::svrWorkerThread(void* lpParam)
 #else 
 	socklen_t addrClientLen = sizeof(addrClient);
 #endif
-
-
-
+	
 	while (1)
 	{
 #ifdef WIN32
