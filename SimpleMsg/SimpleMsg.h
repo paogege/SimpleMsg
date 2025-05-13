@@ -16,6 +16,17 @@ enum class MsgrType :int32_t
 	CLN,
 };
 
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <ctime>
+
+// 获取当前时间的字符串表示
+std::string getCurrentTime();
+
+// 写日志函数
+void writeLog(const std::string& message, const std::string& logFile = "log.txt");
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -63,5 +74,6 @@ private:
 	std::list <std::string> m_recvList;
 	MsgrType m_type;
 	msgHandler m_hdr = 0;
+	int m_localSocket;
 };
 

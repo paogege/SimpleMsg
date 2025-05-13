@@ -1,5 +1,11 @@
 #include <stdio.h>
 #include <thread>
+
+#include "SimpleMsg.h"
+
+#define BUF_SIZE 6400  //  缓冲区大小
+#define LIST_SIZE 300
+
 #ifdef WIN32
 #include <Winsock2.h> //Socket的函数调用　
 #include <windows.h>
@@ -27,10 +33,26 @@
 #define _INVALID_SOCKET -1
 #define _SOCKET_ERROR -1
 #endif
-#include "SimpleMsg.h"
 
-#define BUF_SIZE 6400  //  缓冲区大小
-#define LIST_SIZE 300
+// 获取当前时间的字符串表示
+std::string getCurrentTime() {
+	std::time_t now = std::time(nullptr);
+	char buf[80];
+	std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
+	return std::string(buf);
+}
+
+// 写日志函数
+void writeLog(const std::string& message, const std::string& logFile) {
+	std::ofstream logStream(logFile, std::ios::app); // 以追加模式打开文件
+	if (logStream.is_open()) {
+		logStream << "[" << getCurrentTime() << "] " << message << std::endl;
+		logStream.close();
+	}
+	else {
+		std::cerr << "无法打开日志文件: " << logFile << std::endl;
+	}
+}
 
 SimpleMsg::SimpleMsg(MsgrType mt, int port)
 {
@@ -54,6 +76,7 @@ SimpleMsg::SimpleMsg(MsgrType mt, int port)
 			_SOCKETCLN;
 			return;
 		}
+		m_localSocket = sServer;
 
 		//  服务端地址
 		sockaddr_in addrServ;
@@ -69,10 +92,10 @@ SimpleMsg::SimpleMsg(MsgrType mt, int port)
 			_SOCKETCLN;
 			return;
 		}
-
+		m_inited = true;
 		std::thread wthrd(&SimpleMsg::svrWorkerThread, this, (void*)&sServer);
 		wthrd.detach();
-		m_inited = true;
+		
 	}
 
 	else if (mt == MsgrType::CLN)
@@ -83,10 +106,11 @@ SimpleMsg::SimpleMsg(MsgrType mt, int port)
 			printf("socket faild!\n");
 			_SOCKETCLN;
 		}
-
+		m_localSocket = sHost;
+		m_inited = true;
 		std::thread wthrd(&SimpleMsg::clnWorkerThread, this, (void*)&sHost);
 		wthrd.detach();
-		m_inited = true;
+		
 	}
 }
 
@@ -104,6 +128,7 @@ SimpleMsg::~SimpleMsg()
 		}
 	}
 	m_over = true;
+	_CLOSESOCKET(m_localSocket);
 	_SOCKETCLN;
 }
 
@@ -161,6 +186,7 @@ unsigned int STDCALL_ SimpleMsg::Rcv(void* lpParam)
 		int remainSize = 4;
 		while (remainSize > 0)
 		{
+			
 			retVal = recv(sHost, (char*)dataSize, remainSize, 0);
 			if (retVal == -1 || retVal == 0) {
 				printf("recive faild!\n");
@@ -180,7 +206,9 @@ unsigned int STDCALL_ SimpleMsg::Rcv(void* lpParam)
 		auto bufRecv = new char[remainSize + 1];
 		while (remainSize > 0)
 		{
+			writeLog("before recv\n", "svr.log");
 			retVal = recv(sHost, bufRecv + (iSize - remainSize), remainSize, 0);
+			writeLog("after recv\n", "svr.log");
 			if (retVal == -1 || retVal == 0) {
 				printf("recive faild!\n");
 				m_serror = true;
@@ -198,10 +226,12 @@ unsigned int STDCALL_ SimpleMsg::Rcv(void* lpParam)
 		//printf("收到服务器消息：%s\n", bufRecv);
 		if (m_hdr)
 		{
+			writeLog("call msgHandler", "svr.log");
 			m_hdr(bufRecv);
 		}
 		else
 		{
+			writeLog("recvList.push", "svr.log");
 			std::lock_guard<std::mutex> lock(m_recvMutex);
 			while (m_recvList.size() >= LIST_SIZE)
 			{
@@ -290,6 +320,7 @@ void SimpleMsg::svrWorkerThread(void* lpParam)
 		sClient = accept(sServer, (struct sockaddr*)&addrClient, &addrClientLen);
 #endif
 		printf("new client:%d\n", sClient);
+		writeLog("new client:" + std::to_string((int)sClient) + "\n", "svr.log");
 		if (sClient == _INVALID_SOCKET) {
 			printf("accept faild!\n");
 			_CLOSESOCKET(sServer);
