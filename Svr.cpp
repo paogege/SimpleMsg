@@ -20,7 +20,7 @@ int main(int argc, char* argv[])
 		_sleep(0);
 	}
 #else
-	auto msgr = createMessager(MsgrType::SVR, MSGPORT);
+	auto msgr = createMessager(MsgrType::SVR);
 	setMessagerReceiver(msgr, gotMsg);
 	char buf[1000] = { 0 };
 	while (isMessagerAvailabe(msgr))

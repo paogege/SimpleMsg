@@ -7,6 +7,12 @@
 #define STDCALL_ __attribute__((__stdcall__))
 #endif
 
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <ctime>
+
+
 
 #define MSGPORT 9988
 
@@ -16,10 +22,8 @@ enum class MsgrType :int32_t
 	CLN,
 };
 
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <ctime>
+class SvrMem;
+class ClnMem;
 
 // 获取当前时间的字符串表示
 std::string getCurrentTime();
@@ -35,7 +39,7 @@ extern "C" {
 
 	typedef void* Messager;
 
-	Messager createMessager(MsgrType mt, int port);
+	Messager createMessager(MsgrType mt);
 	void destroyMessager(Messager handle);
 	int MessagerSend(Messager handle, char* pString, int size);
 	int MessagerRecv(Messager handle, char* pString, int size);
@@ -49,7 +53,7 @@ extern "C" {
 class SimpleMsg
 {
 public :
-	SimpleMsg(MsgrType mt, int port);
+	SimpleMsg(MsgrType mt);
 	~SimpleMsg();
 	//非阻塞，发送字符串
 	int sendMsg(const std::string& msg);
@@ -64,6 +68,7 @@ private:
 	unsigned int STDCALL_ Snd(void* lpParam);
 	void svrWorkerThread(void* lpParam);
 	void clnWorkerThread(void* lpParam);
+	bool getAvailableListenPort(std::string &port);
 	bool m_inited = false;
 	bool m_over = false;
 	int m_port = 0;
@@ -74,6 +79,8 @@ private:
 	std::list <std::string> m_recvList;
 	MsgrType m_type;
 	msgHandler m_hdr = 0;
+	SvrMem * m_pMemCP = nullptr;
+	ClnMem * m_pClnMem = nullptr;
 	int m_localSocket;
 };
 

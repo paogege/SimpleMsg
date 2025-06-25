@@ -43,7 +43,7 @@ int main(int argc, char* argv[])
 		_sleep(0);
 	}
 #else
-	auto msgr = createMessager(MsgrType::CLN, MSGPORT);
+	auto msgr = createMessager(MsgrType::CLN);
 	setMessagerReceiver(msgr, gotMsg);
 	char buf[1000] = { 0 };
 	while (isMessagerAvailabe(msgr))

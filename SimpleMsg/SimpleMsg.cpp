@@ -25,6 +25,11 @@
 #include <errno.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include <net/if.h>
+#include <sys/types.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <sys/select.h>
 #define _SOCKET int
 #define _CLOSESOCKET close
 #define _SOCKETCLN	;
@@ -33,6 +38,8 @@
 #define _INVALID_SOCKET -1
 #define _SOCKET_ERROR -1
 #endif
+
+#include "shareMemCP.h"
 
 // 获取当前时间的字符串表示
 std::string getCurrentTime() {
@@ -54,25 +61,44 @@ void writeLog(const std::string& message, const std::string& logFile) {
 	}
 }
 
-SimpleMsg::SimpleMsg(MsgrType mt, int port)
+
+
+
+
+
+SimpleMsg::SimpleMsg(MsgrType mt)
 {
 #ifdef WIN32
 	WSADATA wsaData;
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-		printf("winsock load faild!\n");
+		//printf("winsock load faild!\n");
 		return;
 	}
 #endif
 
-	m_port = port;
+	//m_port = port;
 	m_type = mt;
 
 	if (mt == MsgrType::SVR)
 	{
+		m_pMemCP = new SvrMem();
+		std::string portStr;
+		if (getAvailableListenPort(portStr))
+		{
+			m_pMemCP->writeContent((char*)portStr.c_str());
+			m_port = atoi(portStr.c_str());
+		}
+		else
+		{
+			return;
+		}
+
+
+
 		//  创建服务段套接字
 		_SOCKET sServer = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 		if (sServer == _INVALID_SOCKET) {
-			printf("socket faild!\n");
+			//printf("socket faild!\n");
 			_SOCKETCLN;
 			return;
 		}
@@ -87,7 +113,7 @@ SimpleMsg::SimpleMsg(MsgrType mt, int port)
 
 		//  绑定套接字
 		if (bind(sServer, (const struct sockaddr*)&addrServ, sizeof(addrServ)) == _SOCKET_ERROR) {
-			printf("bind faild!\n");
+			//printf("bind faild!\n");
 			_CLOSESOCKET(sServer);
 			_SOCKETCLN;
 			return;
@@ -100,10 +126,19 @@ SimpleMsg::SimpleMsg(MsgrType mt, int port)
 
 	else if (mt == MsgrType::CLN)
 	{
+		m_pClnMem = new ClnMem();
+		char * portStr = m_pClnMem->readContent();
+		
+
+		m_port = atoi(portStr);
+
+		delete m_pClnMem;
+		m_pClnMem = nullptr;
+
 		//  服务器套接字
 		_SOCKET sHost = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 		if (sHost == _INVALID_SOCKET) {
-			printf("socket faild!\n");
+			//printf("socket faild!\n");
 			_SOCKETCLN;
 		}
 		m_localSocket = sHost;
@@ -127,6 +162,11 @@ SimpleMsg::~SimpleMsg()
 			continue;
 		}
 	}
+	if (m_type == MsgrType::SVR)
+	{
+		delete m_pMemCP;
+	}
+
 	m_over = true;
 	//use sleep to avoid sendind failures
 	_SLEEP(300);
@@ -202,7 +242,7 @@ unsigned int STDCALL_ SimpleMsg::Rcv(void* lpParam)
 #endif
 			retVal = recv(sHost, (char*)dataSize, remainSize, 0);
 			if (retVal == -1 || retVal == 0) {
-				printf("recive faild!\n");
+				//printf("recive faild!\n");
 #ifdef _DEBUG
 				writeLog("receive faild", "svr.log");
 #endif
@@ -235,7 +275,7 @@ unsigned int STDCALL_ SimpleMsg::Rcv(void* lpParam)
 		{
 			retVal = recv(sHost, bufRecv + (iSize - remainSize), remainSize, 0);
 			if (retVal == -1 || retVal == 0) {
-				printf("recive faild!\n");
+				//printf("recive faild!\n");
 				m_serror = true;
 				break;
 			}
@@ -287,7 +327,7 @@ unsigned int STDCALL_ SimpleMsg::Snd(void* lpParam)
 				retVal = send(sHost, (char*)&msgSize + (4 - remainSize), remainSize, 0);
 				_SLEEP(0);
 				if (retVal == -1) {
-					printf("send faild!\n");
+					//printf("send faild!\n");
 					m_serror = true;
 					break;
 				}
@@ -302,7 +342,7 @@ unsigned int STDCALL_ SimpleMsg::Snd(void* lpParam)
 				_SLEEP(0);
 				remainSize -= retVal;
 				if (retVal == -1) {
-					printf("send faild!\n");
+					//printf("send faild!\n");
 					m_serror = true;
 					break;
 				}
@@ -319,7 +359,7 @@ void SimpleMsg::svrWorkerThread(void* lpParam)
 {
 	_SOCKET sServer = *(_SOCKET*)lpParam;
 	if (listen(sServer, 5) == -1) {
-		printf("listen faild!\n");
+		//printf("listen faild!\n");
 		_CLOSESOCKET(sServer);
 		_SOCKETCLN;
 		return;
@@ -342,7 +382,7 @@ void SimpleMsg::svrWorkerThread(void* lpParam)
 		sClient = accept(sServer, (struct sockaddr*)&addrClient, &addrClientLen);
 #endif
 		if (sClient == _INVALID_SOCKET) {
-			printf("accept faild!\n");
+			//printf("accept faild!\n");
 			_CLOSESOCKET(sServer);
 			_SOCKETCLN;
 			return;
@@ -375,7 +415,7 @@ void SimpleMsg::clnWorkerThread(void* lpParam)
 
 	//  连接服务器
 	if (connect(sHost, (sockaddr*)&servAddr, sizeof(servAddr)) == _SOCKET_ERROR) {
-		printf("connect faild!\n");
+		//printf("connect faild!\n");
 		_CLOSESOCKET(sHost);
 		_SOCKETCLN;
 	}
@@ -388,7 +428,7 @@ void SimpleMsg::clnWorkerThread(void* lpParam)
 		t2.join();
 		if (m_serror)
 		{
-			printf("SOCKET is invalid.");
+			//printf("SOCKET is invalid.");
 			break;
 		}
 	}
@@ -398,9 +438,70 @@ void SimpleMsg::clnWorkerThread(void* lpParam)
 	_SOCKETCLN;
 }
 
-Messager createMessager(MsgrType mt, int port)
+bool SimpleMsg::getAvailableListenPort(std::string &port)
 {
-	return new SimpleMsg(mt,port);
+	bool result = true;
+
+#ifdef WIN32
+	WSADATA wsa;
+	/*初始化socket资源*/
+	if (WSAStartup(MAKEWORD(1, 1), &wsa) != 0)
+	{
+		return false;   //代表失败
+	}
+#endif
+
+	// 1. 创建一个socket
+	int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+	// 2. 创建一个sockaddr，并将它的端口号设为0
+	struct sockaddr_in addrto;
+	memset(&addrto, 0, sizeof(struct sockaddr_in));
+	addrto.sin_family = AF_INET;
+	addrto.sin_addr.s_addr = inet_addr("127.0.0.1");
+	addrto.sin_port = 0;
+
+	// 3. 绑定
+	int ret = ::bind(sock, (struct sockaddr *)&(addrto), sizeof(struct sockaddr_in));
+	if (0 != ret)
+	{
+		return false;
+	}
+
+	// 4. 利用getsockname获取
+	struct sockaddr_in connAddr;
+	memset(&connAddr, 0, sizeof(struct sockaddr_in));
+#ifdef WIN32
+	int len = sizeof(connAddr);
+#else
+	unsigned int len = sizeof(connAddr);
+#endif
+	ret = ::getsockname(sock, (sockaddr*)&connAddr, &len);
+
+	if (0 != ret)
+	{
+		return false;
+	}
+
+	port = std::to_string(ntohs(connAddr.sin_port)); // 获取端口号
+
+#ifdef WIN32
+	if (0 != closesocket(sock))
+#else
+	if (0 != close(sock))
+#endif
+	{
+		result = false;
+	}
+#ifdef _WIN32
+	WSACleanup();
+#endif
+	return result;
+}
+
+Messager createMessager(MsgrType mt)
+{
+	return new SimpleMsg(mt);
 }
 
 void destroyMessager(Messager handle)

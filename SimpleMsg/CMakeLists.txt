@@ -1,1 +1,1 @@
-add_library(SimpleMsg STATIC SimpleMsg.cpp)
+add_library(SimpleMsg STATIC SimpleMsg.cpp shareMemCP.cpp)
