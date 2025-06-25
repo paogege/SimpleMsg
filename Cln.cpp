@@ -1,5 +1,18 @@
-#include "SimpleMsg.h"
+#ifdef __linux
+#include <cstring>
+#include <unistd.h>
+#elif _WIN32
+#include <windows.h>
+#endif
 
+
+#ifdef _WIN32
+#define SLEEP(t) Sleep(t)
+#elif __linux
+#define SLEEP(t) sleep(t)
+#endif
+
+#include "SimpleMsg.h"
 
 extern "C" void gotMsg(char* msg)
 {
@@ -40,7 +53,7 @@ int main(int argc, char* argv[])
 	{
 		fgets(buf, sizeof(buf), stdin);
 		msgr.sendMsg(buf);
-		_sleep(0);
+		SLEEP(0);
 	}
 #else
 	auto msgr = createMessager(MsgrType::CLN);
@@ -50,7 +63,7 @@ int main(int argc, char* argv[])
 	{
 		fgets(buf, sizeof(buf), stdin);
 		MessagerSend(msgr, buf, strlen(buf));
-		_sleep(0);
+		SLEEP(0);
 	}
 #endif
 	return 0;

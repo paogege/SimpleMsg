@@ -2,6 +2,7 @@ cmake_minimum_required (VERSION 3.8)
 project(SFD)
 include_directories(${CMAKE_SOURCE_DIR}/SimpleMsg)
 add_subdirectory("SimpleMsg")
+set(CMAKE_CXX_FLAGS -pthread)
 add_executable (Svr "Svr.cpp")
 add_executable (Cln "Cln.cpp")
 

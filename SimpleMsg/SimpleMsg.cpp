@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <thread>
+#include <cstring>
 
 #include "SimpleMsg.h"
 
@@ -520,7 +521,7 @@ int MessagerRecv(Messager handle, char * pString, int size)
 	int ret = static_cast<SimpleMsg*>(handle)->recvMsg(buf);
 	if (ret >= 0 && ret >= size + 1)
 	{
-		strcpy_s(pString, buf.size() + 1, buf.c_str());
+		 strncpy(pString,  buf.c_str(), buf.size() + 1);
 		return ret;
 	}
 	else
