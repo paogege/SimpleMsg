@@ -12,7 +12,8 @@
 #include <windows.h>
 #define _SOCKET SOCKET
 #define _CLOSESOCKET closesocket
-#define _SOCKETCLN	WSACleanup()
+#define _SOCKETCLN	
+//#define _SOCKETCLN	WSACleanup()
 #define _SLEEP Sleep
 #define _SOCKADDR_IN SOCKADDR_IN
 #define _INVALID_SOCKET INVALID_SOCKET
@@ -160,7 +161,8 @@ SimpleMsg::~SimpleMsg()
 		if (m_sendList.size())
 		{
 			waitSend = true;
-			continue;
+			_SLEEP(100);
+			//continue;
 		}
 	}
 	if (m_type == MsgrType::SVR)
@@ -230,22 +232,27 @@ unsigned int STDCALL_ SimpleMsg::Rcv(void* lpParam)
 		while (remainSize > 0)
 		{			
 #ifdef _DEBUG
+			std::string msgPref;
 			std::string msg;
 			if (m_type == MsgrType::SVR)
 			{
-				msg = "SVR before receive";
+				msgPref = "SVR ";
 			}
 			else
 			{
-				msg = "CLN before receive";
+				msgPref = "CLN ";
 			}
+
+			msg = msgPref + "before recv.";
+
 			writeLog(msg, "svr.log");
 #endif
 			retVal = recv(sHost, (char*)dataSize, remainSize, 0);
 			if (retVal == -1 || retVal == 0) {
 				//printf("recive faild!\n");
 #ifdef _DEBUG
-				writeLog("receive faild", "svr.log");
+				
+				writeLog(msgPref + "receive faild", "svr.log");
 #endif
 				m_serror = true;
 				break;
@@ -361,6 +368,7 @@ void SimpleMsg::svrWorkerThread(void* lpParam)
 	_SOCKET sServer = *(_SOCKET*)lpParam;
 	if (listen(sServer, 5) == -1) {
 		//printf("listen faild!\n");
+		auto en = WSAGetLastError();
 		_CLOSESOCKET(sServer);
 		_SOCKETCLN;
 		return;
@@ -389,15 +397,16 @@ void SimpleMsg::svrWorkerThread(void* lpParam)
 			return;
 		}
 		m_serror = false;
-		std::thread t1(&SimpleMsg::Snd, this, (void**)&sClient);
+		auto newClient = sClient;
+		std::thread t1(&SimpleMsg::Snd, this, (void**)&newClient);
 		t1.detach();
-		std::thread t2(&SimpleMsg::Rcv, this, (void**)&sClient);
-		t2.join();
+		std::thread t2(&SimpleMsg::Rcv, this, (void**)&newClient);
+		t2.detach();/**/
 	}
 
 
 
-	_CLOSESOCKET(sClient);
+	_CLOSESOCKET(sServer);
 	_SOCKETCLN; // 资源释放
 }
 
@@ -417,6 +426,7 @@ void SimpleMsg::clnWorkerThread(void* lpParam)
 	//  连接服务器
 	if (connect(sHost, (sockaddr*)&servAddr, sizeof(servAddr)) == _SOCKET_ERROR) {
 		//printf("connect faild!\n");
+		auto en = WSAGetLastError();
 		_CLOSESOCKET(sHost);
 		_SOCKETCLN;
 	}
